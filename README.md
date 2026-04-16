@@ -1,72 +1,114 @@
-# e-Paper-Image-Display-Website
-Raspberry Pi image display website using Waveshare e-paper 2.7 inch display.
-![image](https://user-images.githubusercontent.com/82937328/154991286-27bc96e1-8f54-427f-a07c-06bd6431e48a.png)
+# Pi e-Paper Image Gallery
 
+A Raspberry Pi web application that lets users upload images through a browser, processes them for display, and renders them on a Waveshare 2.7" e-Paper screen — with an optional approval queue, live queue stats, and automatic image orientation handling.
 
-# Features
+---
 
-- Website where users can upload images
-- Approve images before displaying on e-Paper Display
-- Process images to correct height before displaying
-- Use queues to ensure each image gets displayed
-- Displays queue information on website
+## Overview
 
-# Getting Started
+This project runs a Flask web server on a Raspberry Pi. Users on the local network visit the page, upload an image, and it gets added to a display queue. Images are automatically resized and rotated to fit the e-Paper display's resolution. An optional Tkinter approval window lets an admin preview and approve or decline each submission before it reaches the screen.
 
-## Prerequisites
+---
 
-(These instructions assume that your Raspberry Pi is already connected to the Internet, happily running `pip` and has `python3` installed)
+## Features
 
-If you are running the Pi headless, connect to your Raspberry Pi using `ssh`.
+- **Browser-based upload** — any device on the local network can submit images via the web interface
+- **Approval mode** — optional Tkinter window for previewing and approving/declining images before display
+- **Smart image processing** — auto-detects portrait vs landscape orientation and resizes to the correct e-Paper resolution (176×264 or 264×176)
+- **Queue management** — thread-safe queue ensures images display one at a time with a 10-second interval between each
+- **Live queue stats** — estimated wait time, queue length, and total images displayed pushed to the browser via Server-Sent Events (SSE)
+- **Threaded architecture** — Flask server, display queue, and approval queue each run on independent threads
 
-Connect to your Pi over ssh and update and install necessary packages 
+---
+
+## Tech Stack
+
+- **Language:** Python 3
+- **Hardware:** Raspberry Pi + Waveshare 2.7" e-Paper display
+- **Web:** Flask + Server-Sent Events (SSE)
+- **Image processing:** Pillow (PIL)
+- **GUI (approval mode):** Tkinter
+- **Concurrency:** `threading` + `queue` modules
+
+---
+
+## Project Structure
+
 ```
+pi-epaper-image-gallery/
+├── main.py          # Flask app, queue logic, e-Paper display handler, approval Tkinter window
+├── requirements.txt # Python dependencies
+└── templates/
+    └── index.html   # Upload form and live queue stats page
+```
+
+---
+
+## How It Works
+
+1. Flask serves `index.html` — a simple upload form with a live queue status panel
+2. On image submit, the file is saved to `images/` and placed in either the display queue or approval queue depending on the `approval` flag
+3. If approval is enabled, a Tkinter window shows each submitted image — admin clicks **Approve** (adds to display queue) or **Decline** (discards)
+4. The display queue handler picks images one by one, determines orientation, resizes with Pillow, and pushes the buffer to the e-Paper via the Waveshare `epd2in7` library
+5. Queue length and estimated time remaining stream to the browser every second via SSE
+
+---
+
+## Setup
+
+**1. Clone the repo on your Raspberry Pi**
+```bash
+git clone https://github.com/candtk/pi-epaper-image-gallery.git
+cd pi-epaper-image-gallery
+```
+
+**2. Install Waveshare e-Paper library**
+```bash
 sudo apt-get update
-sudo apt-get install -y python3-pip mc git libopenjp2-7
-sudo apt-get install -y libatlas-base-dev python3-pil
+sudo apt-get install -y python3-pip libopenjp2-7 libatlas-base-dev python3-pil
+git clone https://github.com/waveshare/e-Paper ~/e-Paper
+cp -r ~/e-Paper/RaspberryPi_JetsonNano/python/lib/waveshare_epd .
+rm -rf ~/e-Paper
 ```
 
-Now clone the required software (Waveshare libraries and this script)
-
-```
-cd ~
-git clone https://github.com/waveshare/e-Paper
-git clone https://github.com/foxzsz/e-Paper-Image-Display-Website
-```
-Move to the `e-Paper-Image-Display-Website` directory, copy the required part of waveshare epd to directory 
-```
-cd e-Paper-Image-Display-Website
-cp -r /home/pi/e-Paper/RaspberryPi_JetsonNano/python/lib/waveshare_epd .
-rm -rf /home/pi/e-Paper
-```
-Install the required Python3 modules
-```
-python3 -m pip install -r requirements.txt
+**3. Install Python dependencies**
+```bash
+pip3 install -r requirements.txt
 ```
 
-## Running the code
-Run the main.py file
-``` 
+**4. Run**
+```bash
 python3 main.py
 ```
-If run successfully it will output that the Flask Webapp is running. To visit the website open the browser and enter 0.0.0.0:5000
 
-If approval of images is enabled ensure that you are connected via `VNC Viewer` or have the Tkinter window open using `MobaXterm` to approve and decline images.
+The server starts at `http://0.0.0.0:5000`. Access it from any device on the same network using your Pi's IP address:
+```
+http://<raspberry-pi-ip>:5000
+```
 
-## Connecting to the website from other devices on local network
-Use the ip address of the raspberry pi in the url and add :5000 at the end of the url. 
+Find your Pi's IP with:
+```bash
+hostname -I
+```
 
-For example, your raspberry pi ip address is `192.168.160.254` then your url would look like `http://192.168.160.254:5000`.
+---
 
-Find out the ip address using `ip config` on your terminal
+## Configuration
 
-## Limitations
-Images are resized, they can look ugly sometimes
+At the bottom of `main.py`, tweak the startup options:
 
-Images display as black and white.
+```python
+InitiateApp = ImageDisplayWeb(host="0.0.0.0", port=5000, approval=True)
+```
 
+| Option | Default | Description |
+|---|---|---|
+| `host` | `0.0.0.0` | Network interface to bind to |
+| `port` | `5000` | Port the web server listens on |
+| `approval` | `True` | Enable/disable the Tkinter approval window |
 
-# Credits
-[foxzsz](https://github.com/foxzsz) - Creating the python code and html to run the website
+---
 
-[ss3387](https://github.com/ss3387) - Creating the code to display images on tkinter and on e-paper
+## License
+
+MIT
